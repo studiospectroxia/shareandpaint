@@ -143,28 +143,34 @@
     #status.connecting   { background: #cc9922; }
 
     /* ── Palette row ── */
-    .t-palette {
-      padding: 0 14px 8px;
-      gap: 0;
-    }
-    #palette {
-      display: flex;
-      gap: 4px;
+    .t-palette { padding: 0 14px 10px; }
+    #palette-slider {
+      -webkit-appearance: none;
+      appearance: none;
       width: 100%;
-    }
-    .swatch {
-      flex: 1;
-      min-width: 16px;
-      height: 26px;
+      height: 10px;
       border-radius: 5px;
-      border: 2px solid transparent;
+      border: none;
+      outline: none;
       cursor: pointer;
-      transition: transform .1s, border-color .1s;
-      padding: 0;
-      flex-shrink: 0;
     }
-    .swatch:hover  { transform: scaleY(1.18); }
-    .swatch.active { border-color: #fff; transform: scaleY(1.18); }
+    #palette-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 22px; height: 22px;
+      border-radius: 50%;
+      border: 2.5px solid #fff;
+      background: var(--thumb-color, #8b52ff);
+      box-shadow: 0 1px 5px rgba(0,0,0,0.6);
+      cursor: pointer;
+    }
+    #palette-slider::-moz-range-thumb {
+      width: 22px; height: 22px;
+      border-radius: 50%;
+      border: 2.5px solid #fff;
+      background: var(--thumb-color, #8b52ff);
+      box-shadow: 0 1px 5px rgba(0,0,0,0.6);
+      cursor: pointer;
+    }
 
     /* ── Toast ── */
     #toast {
@@ -306,9 +312,9 @@
 
     </div>
 
-    <!-- Row 2: color palette -->
+    <!-- Row 2: color palette slider -->
     <div class="t-row t-palette">
-      <div id="palette"></div>
+      <input type="range" id="palette-slider" min="0" max="19" value="8" step="1">
     </div>
 
   </div>
@@ -366,7 +372,6 @@ const canvas     = document.getElementById('canvas');
 const ctx        = canvas.getContext('2d');
 const previewDot = document.getElementById('preview-dot');
 const statusEl   = document.getElementById('status');
-const paletteEl  = document.getElementById('palette');
 const sizeSlider = document.getElementById('size-slider');
 const toastEl    = document.getElementById('toast');
 
@@ -417,7 +422,7 @@ function fitCanvas() {
 
 function zoomAt(newZoom, cx, cy) {   // cx,cy in container-center coords
   const oldZ = zoom;
-  zoom = Math.max(1, Math.min(5, newZoom));
+  zoom = Math.max(1, Math.min(1.4, newZoom));
   panX = cx * (1 - zoom / oldZ) + panX * (zoom / oldZ);
   panY = cy * (1 - zoom / oldZ) + panY * (zoom / oldZ);
   applyTransform();
@@ -426,27 +431,18 @@ function zoomAt(newZoom, cx, cy) {   // cx,cy in container-center coords
 // ResizeObserver fires after layout is computed — most reliable
 new ResizeObserver(fitCanvas).observe(canvasWrap);
 
-// ── Palette ───────────────────────────────────────────────────────
-PALETTE.forEach(color => {
-  const btn = document.createElement('button');
-  btn.className = 'swatch' + (color === tool.color ? ' active' : '');
-  btn.style.background = color;
-  btn.dataset.color = color;
-  if (color === '#ffffff') {
-    btn.style.boxShadow = 'inset 0 0 0 1px rgba(196,168,255,0.3)';
-  }
-  btn.addEventListener('click', () => selectColor(color));
-  paletteEl.appendChild(btn);
-});
+// ── Palette slider ────────────────────────────────────────────────
+const paletteSlider = document.getElementById('palette-slider');
+paletteSlider.style.background = `linear-gradient(to right, ${PALETTE.join(', ')})`;
+paletteSlider.style.setProperty('--thumb-color', tool.color);
 
-function selectColor(color) {
-  tool.color  = color;
+paletteSlider.addEventListener('input', () => {
+  tool.color  = PALETTE[Number(paletteSlider.value)];
   tool.eraser = false;
-  document.querySelectorAll('.swatch').forEach(s =>
-    s.classList.toggle('active', s.dataset.color === color));
   document.getElementById('eraser-btn').classList.remove('active');
+  paletteSlider.style.setProperty('--thumb-color', tool.color);
   updatePreview();
-}
+});
 
 // ── Size slider ───────────────────────────────────────────────────
 sizeSlider.addEventListener('input', () => {
@@ -476,12 +472,7 @@ document.querySelectorAll('.shape-btn').forEach(btn => {
 document.getElementById('eraser-btn').addEventListener('click', () => {
   tool.eraser = !tool.eraser;
   document.getElementById('eraser-btn').classList.toggle('active', tool.eraser);
-  if (tool.eraser) {
-    document.querySelectorAll('.swatch').forEach(s => s.classList.remove('active'));
-  } else {
-    document.querySelectorAll('.swatch').forEach(s =>
-      s.classList.toggle('active', s.dataset.color === tool.color));
-  }
+  if (!tool.eraser) tool.color = PALETTE[Number(paletteSlider.value)];
   updatePreview();
 });
 
@@ -506,7 +497,7 @@ document.getElementById('share-btn').addEventListener('click', async () => {
 // ── Preview dot ───────────────────────────────────────────────────
 function updatePreview() {
   const MAX_PX = 34;
-  const actualSize = tool.eraser ? 40 : tool.size;
+  const actualSize = tool.size;
   const d = Math.min(actualSize, MAX_PX);
   const isRound = tool.eraser || tool.shape === 'round';
 
@@ -540,7 +531,7 @@ function renderStroke(s) {
 
 function effectiveProps() {
   return tool.eraser
-    ? { color: CANVAS_BG, size: 40, shape: 'round' }
+    ? { color: CANVAS_BG, size: tool.size, shape: 'round' }
     : { color: tool.color, size: tool.size, shape: tool.shape };
 }
 
@@ -624,7 +615,7 @@ canvas.addEventListener('touchmove', (e) => {
     // Zoom toward pinch mid
     if (dist > 0 && lastPinchDist > 0) {
       const oldZ = zoom;
-      zoom = Math.max(1, Math.min(5, zoom * dist / lastPinchDist));
+      zoom = Math.max(1, Math.min(1.4, zoom * dist / lastPinchDist));
       panX = m.x * (1 - zoom / oldZ) + panX * (zoom / oldZ);
       panY = m.y * (1 - zoom / oldZ) + panY * (zoom / oldZ);
     }
