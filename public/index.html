@@ -202,11 +202,42 @@
       display: block;
       cursor: crosshair;
       touch-action: none;
+      transform-origin: center center;
+      will-change: transform;
       box-shadow:
         0 0 0 1px #1f0050,
         0 0 60px rgba(110, 47, 255, 0.2),
         0 20px 80px rgba(0, 0, 0, 0.6);
     }
+
+    /* ── Zoom controls (floating bottom-right) ── */
+    #zoom-controls {
+      position: absolute;
+      bottom: 14px;
+      right: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      z-index: 10;
+    }
+    .zbtn {
+      width: 34px; height: 34px;
+      border-radius: 8px;
+      border: 1.5px solid var(--border);
+      background: rgba(13,0,26,0.82);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      color: var(--dim);
+      font-size: 20px;
+      line-height: 1;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: background .12s, border-color .12s;
+      padding: 0;
+      flex-shrink: 0;
+    }
+    .zbtn:hover  { background: rgba(31,0,72,0.9); border-color: var(--active); }
+    .zbtn:active { background: #1a0042; }
   </style>
 </head>
 <body>
@@ -285,6 +316,10 @@
   <!-- ── Canvas ──────────────────────────────────────────────── -->
   <div id="canvas-wrap">
     <canvas id="canvas" width="1200" height="800"></canvas>
+    <div id="zoom-controls">
+      <button class="zbtn" id="zoom-in-btn"  title="Zoom in">+</button>
+      <button class="zbtn" id="zoom-out-btn" title="Zoom out">−</button>
+    </div>
   </div>
 
 </div>
@@ -349,14 +384,43 @@ fillBg();
 // ── Fit canvas to viewport ────────────────────────────────────────
 const canvasWrap = document.getElementById('canvas-wrap');
 
+let zoom   = 1;      // user zoom multiplier (1 = cover-fill)
+let panX   = 0;      // CSS px offset from center
+let panY   = 0;
+let baseW  = 0;      // CSS px at zoom=1 (cover scale)
+let baseH  = 0;
+
+function applyTransform() {
+  const W = canvasWrap.clientWidth;
+  const H = canvasWrap.clientHeight;
+  if (!W || !H) return;
+  const visW = baseW * zoom;
+  const visH = baseH * zoom;
+  const maxPX = Math.max(0, (visW - W) / 2);
+  const maxPY = Math.max(0, (visH - H) / 2);
+  panX = Math.max(-maxPX, Math.min(maxPX, panX));
+  panY = Math.max(-maxPY, Math.min(maxPY, panY));
+  canvas.style.transform = `translate(${panX}px,${panY}px) scale(${zoom})`;
+}
+
 function fitCanvas() {
   const W = canvasWrap.clientWidth;
   const H = canvasWrap.clientHeight;
   if (!W || !H) return;
-  // Cover mode: scale so canvas fills the full container, clipping overflow
   const scale = Math.max(W / canvas.width, H / canvas.height);
-  canvas.style.width  = Math.floor(canvas.width  * scale) + 'px';
-  canvas.style.height = Math.floor(canvas.height * scale) + 'px';
+  baseW = Math.floor(canvas.width  * scale);
+  baseH = Math.floor(canvas.height * scale);
+  canvas.style.width  = baseW + 'px';
+  canvas.style.height = baseH + 'px';
+  applyTransform();
+}
+
+function zoomAt(newZoom, cx, cy) {   // cx,cy in container-center coords
+  const oldZ = zoom;
+  zoom = Math.max(1, Math.min(5, newZoom));
+  panX = cx * (1 - zoom / oldZ) + panX * (zoom / oldZ);
+  panY = cy * (1 - zoom / oldZ) + panY * (zoom / oldZ);
+  applyTransform();
 }
 
 // ResizeObserver fires after layout is computed — most reliable
@@ -483,28 +547,26 @@ function effectiveProps() {
 // ── Pointer input ─────────────────────────────────────────────────
 let drawing = false, lastX = 0, lastY = 0;
 
-function canvasXY(e) {
-  const r = canvas.getBoundingClientRect();
+// pt = anything with .clientX / .clientY (MouseEvent, Touch, or plain object)
+function canvasXY(pt) {
+  const r  = canvas.getBoundingClientRect();
   const sx = canvas.width  / r.width;
   const sy = canvas.height / r.height;
-  const src = e.touches ? e.touches[0] : e;
-  return [(src.clientX - r.left) * sx, (src.clientY - r.top) * sy];
+  return [(pt.clientX - r.left) * sx, (pt.clientY - r.top) * sy];
 }
 
-function onDown(e) {
-  e.preventDefault();
+function startDraw(pt) {
   drawing = true;
-  [lastX, lastY] = canvasXY(e);
+  [lastX, lastY] = canvasXY(pt);
   const props  = effectiveProps();
   const stroke = { x0: lastX, y0: lastY, x1: lastX, y1: lastY, ...props };
   renderStroke(stroke);
   sendMsg({ type: 'stroke', stroke });
 }
 
-function onMove(e) {
+function moveDraw(pt) {
   if (!drawing) return;
-  e.preventDefault();
-  const [x, y] = canvasXY(e);
+  const [x, y] = canvasXY(pt);
   const props  = effectiveProps();
   const stroke = { x0: lastX, y0: lastY, x1: x, y1: y, ...props };
   renderStroke(stroke);
@@ -512,15 +574,79 @@ function onMove(e) {
   [lastX, lastY] = [x, y];
 }
 
-function onUp() { drawing = false; }
+function stopDraw() { drawing = false; }
 
-canvas.addEventListener('mousedown',  onDown);
-canvas.addEventListener('mousemove',  onMove);
-canvas.addEventListener('mouseup',    onUp);
-canvas.addEventListener('mouseleave', onUp);
-canvas.addEventListener('touchstart', onDown, { passive: false });
-canvas.addEventListener('touchmove',  onMove, { passive: false });
-canvas.addEventListener('touchend',   onUp);
+// ── Mouse ──────────────────────────────────────────────────────────
+canvas.addEventListener('mousedown',  e => { e.preventDefault(); startDraw(e); });
+canvas.addEventListener('mousemove',  e => { e.preventDefault(); moveDraw(e);  });
+canvas.addEventListener('mouseup',    stopDraw);
+canvas.addEventListener('mouseleave', stopDraw);
+
+// ── Touch (draw + pinch-zoom) ──────────────────────────────────────
+let pinching = false, lastPinchDist = 0, lastMidCX = 0, lastMidCY = 0;
+
+function touchDist(touches) {
+  const dx = touches[0].clientX - touches[1].clientX;
+  const dy = touches[0].clientY - touches[1].clientY;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+function touchMidContainer(touches) {
+  const wr = canvasWrap.getBoundingClientRect();
+  return {
+    x: (touches[0].clientX + touches[1].clientX) / 2 - wr.left - wr.width  / 2,
+    y: (touches[0].clientY + touches[1].clientY) / 2 - wr.top  - wr.height / 2,
+  };
+}
+
+canvas.addEventListener('touchstart', (e) => {
+  e.preventDefault();
+  if (e.touches.length >= 2) {
+    drawing  = false;
+    pinching = true;
+    lastPinchDist = touchDist(e.touches);
+    const m = touchMidContainer(e.touches);
+    lastMidCX = m.x; lastMidCY = m.y;
+  } else if (!pinching) {
+    startDraw(e.touches[0]);
+  }
+}, { passive: false });
+
+canvas.addEventListener('touchmove', (e) => {
+  e.preventDefault();
+  if (e.touches.length >= 2) {
+    pinching = true; drawing = false;
+    const dist = touchDist(e.touches);
+    const m    = touchMidContainer(e.touches);
+    // Pan: move by mid-point translation
+    panX += m.x - lastMidCX;
+    panY += m.y - lastMidCY;
+    // Zoom toward pinch mid
+    if (dist > 0 && lastPinchDist > 0) {
+      const oldZ = zoom;
+      zoom = Math.max(1, Math.min(5, zoom * dist / lastPinchDist));
+      panX = m.x * (1 - zoom / oldZ) + panX * (zoom / oldZ);
+      panY = m.y * (1 - zoom / oldZ) + panY * (zoom / oldZ);
+    }
+    lastPinchDist = dist; lastMidCX = m.x; lastMidCY = m.y;
+    applyTransform();
+  } else if (drawing) {
+    moveDraw(e.touches[0]);
+  }
+}, { passive: false });
+
+canvas.addEventListener('touchend', (e) => {
+  if (e.touches.length < 2) pinching = false;
+  if (e.touches.length === 0) drawing = false;
+});
+
+// ── Zoom buttons ──────────────────────────────────────────────────
+document.getElementById('zoom-in-btn').addEventListener('click', () => {
+  zoomAt(zoom * 1.3, 0, 0);
+});
+document.getElementById('zoom-out-btn').addEventListener('click', () => {
+  zoomAt(zoom / 1.3, 0, 0);
+});
 
 // ── Realtime: Ably + fetch ────────────────────────────────────────
 // Strokes are published via Ably (low-latency) and batch-saved to
