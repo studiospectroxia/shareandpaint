@@ -4,9 +4,12 @@
   "description": "Shared collaborative painting canvas",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "dev": "vercel dev"
   },
   "dependencies": {
+    "@vercel/kv": "^3.0.0",
+    "ably": "^2.4.0",
     "ws": "^8.18.0"
   }
 }

@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Share &amp; Paint</title>
+  <script src="https://cdn.ably.com/lib/ably.min-2.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -423,9 +424,10 @@ document.getElementById('eraser-btn').addEventListener('click', () => {
 });
 
 // ── Reset canvas ──────────────────────────────────────────────────
-document.getElementById('reset-btn').addEventListener('click', () => {
+document.getElementById('reset-btn').addEventListener('click', async () => {
   if (!confirm('Clear the canvas for everyone?')) return;
-  sendMsg({ type: 'reset' });
+  // fillBg() fires when the Ably 'clear' event arrives for all clients
+  await fetch('/api/reset', { method: 'POST' }).catch(() => {});
 });
 
 // ── Share link ────────────────────────────────────────────────────
@@ -522,40 +524,65 @@ canvas.addEventListener('touchstart', onDown, { passive: false });
 canvas.addEventListener('touchmove',  onMove, { passive: false });
 canvas.addEventListener('touchend',   onUp);
 
-// ── WebSocket ─────────────────────────────────────────────────────
-let ws = null;
+// ── Realtime: Ably + fetch ────────────────────────────────────────
+// Strokes are published via Ably (low-latency) and batch-saved to
+// Vercel KV every 500 ms so new clients can replay history.
 
-function connect() {
+let ablyChannel = null;
+let pending     = [];
+let saveTimer   = null;
+
+async function initRealtime() {
   setStatus('connecting');
-  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-  ws = new WebSocket(`${proto}//${location.host}`);
 
-  ws.addEventListener('open', () => setStatus('connected'));
+  // 1. Load persisted strokes from KV
+  try {
+    const { strokes } = await fetch('/api/strokes').then(r => r.json());
+    fillBg();
+    strokes.forEach(renderStroke);
+  } catch (e) {
+    console.error('[init] failed to load strokes:', e);
+  }
 
-  ws.addEventListener('message', ({ data }) => {
-    let msg;
-    try { msg = JSON.parse(data); } catch (_) { return; }
-    if      (msg.type === 'init')   { fillBg(); msg.strokes.forEach(renderStroke); }
-    else if (msg.type === 'stroke') { renderStroke(msg.stroke); }
-    else if (msg.type === 'clear')  { fillBg(); }
-  });
+  // 2. Connect to Ably (token fetched from /api/token)
+  const ably = new Ably.Realtime({ authUrl: '/api/token' });
+  ablyChannel = ably.channels.get('canvas');
 
-  ws.addEventListener('close', () => {
-    setStatus('disconnected');
-    setTimeout(connect, 2500);
-  });
-  ws.addEventListener('error', () => ws.close());
+  ably.connection.on('connected',    () => setStatus('connected'));
+  ably.connection.on('disconnected', () => setStatus('disconnected'));
+  ably.connection.on('suspended',    () => setStatus('disconnected'));
+  ably.connection.on('failed',       () => setStatus('disconnected'));
+
+  ablyChannel.subscribe('stroke', msg => renderStroke(msg.data));
+  ablyChannel.subscribe('clear',  ()  => fillBg());
 }
 
+// Called by drawing code — publish immediately, batch-save to KV
 function sendMsg(obj) {
-  if (ws && ws.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify(obj));
+  if (obj.type !== 'stroke') return;
+  if (ablyChannel) ablyChannel.publish('stroke', obj.stroke);
+  pending.push(obj.stroke);
+  if (!saveTimer) saveTimer = setTimeout(flushStrokes, 500);
+}
+
+async function flushStrokes() {
+  saveTimer = null;
+  if (!pending.length) return;
+  const batch = pending.splice(0);
+  try {
+    await fetch('/api/strokes', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ strokes: batch }),
+    });
+  } catch (_) {
+    pending.unshift(...batch); // retry next tick
   }
 }
 
 function setStatus(s) { statusEl.className = s; }
 
-connect();
+initRealtime();
 
 // ── Toast ─────────────────────────────────────────────────────────
 let toastTimer = null;
