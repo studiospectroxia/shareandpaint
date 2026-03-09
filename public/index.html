@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Share &amp; Paint</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:      #0a0010;
+      --tb:      #0d001a;
+      --border:  #2a0060;
+      --active:  #8b52ff;
+      --btn:     #150030;
+      --btnhov:  #1f0048;
+      --dim:     #c4a8ff;
+    }
+
+    html, body {
+      width: 100%; height: 100%;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--dim);
+      font-family: system-ui, sans-serif;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: none;
+    }
+
+    #app {
+      display: flex;
+      flex-direction: column;
+      width: 100%; height: 100%;
+    }
+
+    /* ── Toolbar ─────────────────────────────────────────────── */
+    #toolbar {
+      flex-shrink: 0;
+      background: var(--tb);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .t-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 14px;
+    }
+
+    .sep {
+      width: 1px; height: 32px;
+      background: var(--border);
+      flex-shrink: 0;
+      margin: 0 2px;
+    }
+
+    /* generic button */
+    .tbtn {
+      width: 36px; height: 36px;
+      border-radius: 7px;
+      border: 1.5px solid transparent;
+      background: var(--btn);
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+      transition: background .12s, border-color .12s;
+      padding: 0;
+    }
+    .tbtn:hover  { background: var(--btnhov); }
+    .tbtn.active { border-color: var(--active); background: #1a0042; }
+
+    /* ── Brush preview ── */
+    #preview-wrap {
+      width: 44px; height: 44px;
+      border-radius: 8px;
+      background: #080018;
+      border: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    #preview-dot {
+      pointer-events: none;
+      transition: width .1s, height .1s, border-radius .1s, background .1s;
+    }
+
+    /* ── Size slider ── */
+    #slider-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    #size-slider {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 130px;
+      height: 4px;
+      border-radius: 2px;
+      background: var(--border);
+      outline: none;
+      cursor: pointer;
+    }
+    #size-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px; height: 16px;
+      border-radius: 50%;
+      background: var(--active);
+      border: 2px solid var(--dim);
+      cursor: pointer;
+    }
+    #size-slider::-moz-range-thumb {
+      width: 16px; height: 16px;
+      border-radius: 50%;
+      background: var(--active);
+      border: 2px solid var(--dim);
+      cursor: pointer;
+    }
+
+    /* shape icons */
+    .si {
+      width: 14px; height: 14px;
+      background: var(--dim);
+      display: block;
+    }
+    .si-round  { border-radius: 50%; }
+    .si-square { border-radius: 2px; }
+
+    /* status dot */
+    #status {
+      margin-left: auto;
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #444;
+      flex-shrink: 0;
+      transition: background .3s;
+    }
+    #status.connected    { background: #22dd88; box-shadow: 0 0 6px #22dd88; }
+    #status.disconnected { background: #dd2244; }
+    #status.connecting   { background: #cc9922; }
+
+    /* ── Palette row ── */
+    .t-palette {
+      padding: 0 14px 8px;
+      gap: 0;
+    }
+    #palette {
+      display: flex;
+      gap: 4px;
+      width: 100%;
+    }
+    .swatch {
+      flex: 1;
+      min-width: 16px;
+      height: 26px;
+      border-radius: 5px;
+      border: 2px solid transparent;
+      cursor: pointer;
+      transition: transform .1s, border-color .1s;
+      padding: 0;
+      flex-shrink: 0;
+    }
+    .swatch:hover  { transform: scaleY(1.18); }
+    .swatch.active { border-color: #fff; transform: scaleY(1.18); }
+
+    /* ── Toast ── */
+    #toast {
+      position: fixed;
+      bottom: 24px; left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: #1f0050;
+      border: 1px solid var(--active);
+      color: var(--dim);
+      font-size: 13px;
+      padding: 8px 18px;
+      border-radius: 20px;
+      opacity: 0;
+      transition: opacity .2s, transform .2s;
+      pointer-events: none;
+      white-space: nowrap;
+      z-index: 100;
+    }
+    #toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* ── Canvas area ── */
+    #canvas-wrap {
+      flex: 1;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--bg);
+    }
+    #canvas {
+      display: block;
+      cursor: crosshair;
+      touch-action: none;
+      box-shadow:
+        0 0 0 1px #1f0050,
+        0 0 60px rgba(110, 47, 255, 0.2),
+        0 20px 80px rgba(0, 0, 0, 0.6);
+    }
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ── Toolbar ─────────────────────────────────────────────── -->
+  <div id="toolbar">
+
+    <!-- Row 1: tools -->
+    <div class="t-row">
+
+      <!-- Brush preview -->
+      <div id="preview-wrap">
+        <div id="preview-dot"></div>
+      </div>
+
+      <!-- Size slider -->
+      <div id="slider-wrap">
+        <input type="range" id="size-slider" min="1" max="80" value="6">
+      </div>
+
+      <div class="sep"></div>
+
+      <!-- Shape -->
+      <div style="display:flex;gap:4px;flex-shrink:0">
+        <button class="tbtn shape-btn active" data-shape="round" title="Round">
+          <span class="si si-round"></span>
+        </button>
+        <button class="tbtn shape-btn" data-shape="square" title="Square">
+          <span class="si si-square"></span>
+        </button>
+      </div>
+
+      <div class="sep"></div>
+
+      <!-- Eraser -->
+      <button class="tbtn" id="eraser-btn" title="Eraser">
+        <svg width="22" height="15" viewBox="0 0 22 15" fill="none">
+          <rect x="1" y="1" width="20" height="13" rx="3" stroke="#c4a8ff" stroke-width="1.5"/>
+          <rect x="13.5" y="1" width="7.5" height="13" rx="2" fill="#c4a8ff"/>
+          <line x1="13.5" y1="1" x2="13.5" y2="14" stroke="#0d001a" stroke-width="1"/>
+        </svg>
+      </button>
+
+      <div class="sep"></div>
+
+      <!-- Reset canvas -->
+      <button class="tbtn" id="reset-btn" title="Clear canvas">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+          <path d="M2.5 9a6.5 6.5 0 1 0 1.4-4" stroke="#c4a8ff" stroke-width="1.5" stroke-linecap="round"/>
+          <path d="M2.5 3.5v3.5H6" stroke="#c4a8ff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+
+      <!-- Share link -->
+      <button class="tbtn" id="share-btn" title="Copy share link">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+          <path d="M9 2v9" stroke="#c4a8ff" stroke-width="1.5" stroke-linecap="round"/>
+          <path d="M5.5 5.5L9 2l3.5 3.5" stroke="#c4a8ff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M4 10v5h10v-5" stroke="#c4a8ff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+
+      <!-- Status dot -->
+      <div id="status" class="connecting" title="Connection"></div>
+
+    </div>
+
+    <!-- Row 2: color palette -->
+    <div class="t-row t-palette">
+      <div id="palette"></div>
+    </div>
+
+  </div>
+
+  <!-- ── Canvas ──────────────────────────────────────────────── -->
+  <div id="canvas-wrap">
+    <canvas id="canvas" width="1200" height="800"></canvas>
+  </div>
+
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<script>
+'use strict';
+
+// ── Config ────────────────────────────────────────────────────────
+const CANVAS_BG  = '#0a0010';
+const SIZE_MIN   = 1;
+const SIZE_MAX   = 80;
+
+const PALETTE = [
+  '#ffffff',  // white
+  '#f3eeff',  // whisper lavender
+  '#e0d0ff',  // light lavender
+  '#d9b3ff',  // soft lilac
+  '#c4a8ff',  // medium light
+  '#b890ff',  // periwinkle violet
+  '#a87eff',  // soft violet
+  '#9066ff',  // cornflower
+  '#8b52ff',  // bright violet  ← default
+  '#7840f5',  // electric violet
+  '#6e2fff',  // vivid violet
+  '#601ae0',  // deep violet
+  '#5418e8',  // royal purple
+  '#4808cc',  // strong purple
+  '#3d0db5',  // indigo
+  '#2e0898',  // deep indigo
+  '#270880',  // dark violet
+  '#1a0560',  // near-black violet
+  '#120040',  // very dark
+  '#08001e',  // midnight violet
+];
+
+// ── State ─────────────────────────────────────────────────────────
+const tool = { color: '#8b52ff', size: 6, shape: 'round', eraser: false };
+
+// ── DOM refs ──────────────────────────────────────────────────────
+const canvas     = document.getElementById('canvas');
+const ctx        = canvas.getContext('2d');
+const previewDot = document.getElementById('preview-dot');
+const statusEl   = document.getElementById('status');
+const paletteEl  = document.getElementById('palette');
+const sizeSlider = document.getElementById('size-slider');
+const toastEl    = document.getElementById('toast');
+
+// ── Canvas init ───────────────────────────────────────────────────
+function fillBg() {
+  ctx.save();
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = CANVAS_BG;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.restore();
+}
+fillBg();
+
+// ── Fit canvas to viewport ────────────────────────────────────────
+const canvasWrap = document.getElementById('canvas-wrap');
+
+function fitCanvas() {
+  const W = canvasWrap.clientWidth;
+  const H = canvasWrap.clientHeight;
+  if (!W || !H) return;
+  const AR = canvas.width / canvas.height; // 1200/800 = 1.5
+
+  let w = W, h = W / AR;
+  if (h > H) { h = H; w = H * AR; }
+
+  canvas.style.width  = Math.floor(w) + 'px';
+  canvas.style.height = Math.floor(h) + 'px';
+}
+
+// ResizeObserver fires after layout is computed — most reliable
+new ResizeObserver(fitCanvas).observe(canvasWrap);
+
+// ── Palette ───────────────────────────────────────────────────────
+PALETTE.forEach(color => {
+  const btn = document.createElement('button');
+  btn.className = 'swatch' + (color === tool.color ? ' active' : '');
+  btn.style.background = color;
+  btn.dataset.color = color;
+  if (color === '#ffffff') {
+    btn.style.boxShadow = 'inset 0 0 0 1px rgba(196,168,255,0.3)';
+  }
+  btn.addEventListener('click', () => selectColor(color));
+  paletteEl.appendChild(btn);
+});
+
+function selectColor(color) {
+  tool.color  = color;
+  tool.eraser = false;
+  document.querySelectorAll('.swatch').forEach(s =>
+    s.classList.toggle('active', s.dataset.color === color));
+  document.getElementById('eraser-btn').classList.remove('active');
+  updatePreview();
+}
+
+// ── Size slider ───────────────────────────────────────────────────
+sizeSlider.addEventListener('input', () => {
+  tool.size = Number(sizeSlider.value);
+  updateSliderFill();
+  updatePreview();
+});
+
+function updateSliderFill() {
+  const pct = ((tool.size - SIZE_MIN) / (SIZE_MAX - SIZE_MIN) * 100).toFixed(2);
+  sizeSlider.style.background =
+    `linear-gradient(to right, #8b52ff ${pct}%, #2a0060 ${pct}%)`;
+}
+updateSliderFill();
+
+// ── Shapes ────────────────────────────────────────────────────────
+document.querySelectorAll('.shape-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    tool.shape = btn.dataset.shape;
+    document.querySelectorAll('.shape-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    updatePreview();
+  });
+});
+
+// ── Eraser ────────────────────────────────────────────────────────
+document.getElementById('eraser-btn').addEventListener('click', () => {
+  tool.eraser = !tool.eraser;
+  document.getElementById('eraser-btn').classList.toggle('active', tool.eraser);
+  if (tool.eraser) {
+    document.querySelectorAll('.swatch').forEach(s => s.classList.remove('active'));
+  } else {
+    document.querySelectorAll('.swatch').forEach(s =>
+      s.classList.toggle('active', s.dataset.color === tool.color));
+  }
+  updatePreview();
+});
+
+// ── Reset canvas ──────────────────────────────────────────────────
+document.getElementById('reset-btn').addEventListener('click', () => {
+  if (!confirm('Clear the canvas for everyone?')) return;
+  sendMsg({ type: 'reset' });
+});
+
+// ── Share link ────────────────────────────────────────────────────
+document.getElementById('share-btn').addEventListener('click', async () => {
+  const url = location.href;
+  try {
+    await navigator.clipboard.writeText(url);
+    showToast('Link copied!');
+  } catch (_) {
+    prompt('Copy this link:', url);
+  }
+});
+
+// ── Preview dot ───────────────────────────────────────────────────
+function updatePreview() {
+  const MAX_PX = 34;
+  const actualSize = tool.eraser ? 40 : tool.size;
+  const d = Math.min(actualSize, MAX_PX);
+  const isRound = tool.eraser || tool.shape === 'round';
+
+  previewDot.style.width        = d + 'px';
+  previewDot.style.height       = d + 'px';
+  previewDot.style.borderRadius = isRound ? '50%' : '3px';
+  previewDot.style.background   = tool.eraser ? 'transparent' : tool.color;
+  previewDot.style.border       = tool.eraser ? '2px dashed #8b52ff' : 'none';
+}
+updatePreview();
+
+// ── Stroke rendering ──────────────────────────────────────────────
+function renderStroke(s) {
+  ctx.save();
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.globalAlpha = 1;
+  ctx.strokeStyle = s.color;
+  ctx.fillStyle   = s.color;
+  ctx.lineWidth   = s.size;
+  ctx.lineCap     = s.shape === 'round' ? 'round' : 'square';
+  ctx.lineJoin    = s.shape === 'round' ? 'round'  : 'miter';
+  ctx.beginPath();
+  ctx.moveTo(s.x0, s.y0);
+  ctx.lineTo(
+    (s.x0 === s.x1 && s.y0 === s.y1) ? s.x1 + 0.01 : s.x1,
+    s.y1
+  );
+  ctx.stroke();
+  ctx.restore();
+}
+
+function effectiveProps() {
+  return tool.eraser
+    ? { color: CANVAS_BG, size: 40, shape: 'round' }
+    : { color: tool.color, size: tool.size, shape: tool.shape };
+}
+
+// ── Pointer input ─────────────────────────────────────────────────
+let drawing = false, lastX = 0, lastY = 0;
+
+function canvasXY(e) {
+  const r = canvas.getBoundingClientRect();
+  const sx = canvas.width  / r.width;
+  const sy = canvas.height / r.height;
+  const src = e.touches ? e.touches[0] : e;
+  return [(src.clientX - r.left) * sx, (src.clientY - r.top) * sy];
+}
+
+function onDown(e) {
+  e.preventDefault();
+  drawing = true;
+  [lastX, lastY] = canvasXY(e);
+  const props  = effectiveProps();
+  const stroke = { x0: lastX, y0: lastY, x1: lastX, y1: lastY, ...props };
+  renderStroke(stroke);
+  sendMsg({ type: 'stroke', stroke });
+}
+
+function onMove(e) {
+  if (!drawing) return;
+  e.preventDefault();
+  const [x, y] = canvasXY(e);
+  const props  = effectiveProps();
+  const stroke = { x0: lastX, y0: lastY, x1: x, y1: y, ...props };
+  renderStroke(stroke);
+  sendMsg({ type: 'stroke', stroke });
+  [lastX, lastY] = [x, y];
+}
+
+function onUp() { drawing = false; }
+
+canvas.addEventListener('mousedown',  onDown);
+canvas.addEventListener('mousemove',  onMove);
+canvas.addEventListener('mouseup',    onUp);
+canvas.addEventListener('mouseleave', onUp);
+canvas.addEventListener('touchstart', onDown, { passive: false });
+canvas.addEventListener('touchmove',  onMove, { passive: false });
+canvas.addEventListener('touchend',   onUp);
+
+// ── WebSocket ─────────────────────────────────────────────────────
+let ws = null;
+
+function connect() {
+  setStatus('connecting');
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  ws = new WebSocket(`${proto}//${location.host}`);
+
+  ws.addEventListener('open', () => setStatus('connected'));
+
+  ws.addEventListener('message', ({ data }) => {
+    let msg;
+    try { msg = JSON.parse(data); } catch (_) { return; }
+    if      (msg.type === 'init')   { fillBg(); msg.strokes.forEach(renderStroke); }
+    else if (msg.type === 'stroke') { renderStroke(msg.stroke); }
+    else if (msg.type === 'clear')  { fillBg(); }
+  });
+
+  ws.addEventListener('close', () => {
+    setStatus('disconnected');
+    setTimeout(connect, 2500);
+  });
+  ws.addEventListener('error', () => ws.close());
+}
+
+function sendMsg(obj) {
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify(obj));
+  }
+}
+
+function setStatus(s) { statusEl.className = s; }
+
+connect();
+
+// ── Toast ─────────────────────────────────────────────────────────
+let toastTimer = null;
+function showToast(msg) {
+  toastEl.textContent = msg;
+  toastEl.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2000);
+}
+</script>
+</body>
+</html>

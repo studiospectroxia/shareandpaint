@@ -1,0 +1,12 @@
+{
+  "name": "share-and-paint",
+  "version": "1.0.0",
+  "description": "Shared collaborative painting canvas",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}
