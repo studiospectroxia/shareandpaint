@@ -196,6 +196,7 @@
       align-items: center;
       justify-content: center;
       background: var(--bg);
+      position: relative;
     }
     #canvas {
       display: block;
@@ -352,13 +353,10 @@ function fitCanvas() {
   const W = canvasWrap.clientWidth;
   const H = canvasWrap.clientHeight;
   if (!W || !H) return;
-  const AR = canvas.width / canvas.height; // 1200/800 = 1.5
-
-  let w = W, h = W / AR;
-  if (h > H) { h = H; w = H * AR; }
-
-  canvas.style.width  = Math.floor(w) + 'px';
-  canvas.style.height = Math.floor(h) + 'px';
+  // Cover mode: scale so canvas fills the full container, clipping overflow
+  const scale = Math.max(W / canvas.width, H / canvas.height);
+  canvas.style.width  = Math.floor(canvas.width  * scale) + 'px';
+  canvas.style.height = Math.floor(canvas.height * scale) + 'px';
 }
 
 // ResizeObserver fires after layout is computed — most reliable
