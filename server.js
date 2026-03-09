@@ -101,7 +101,7 @@ function isValidStroke(s) {
     Number.isFinite(s.x1) && Number.isFinite(s.y1) &&
     typeof s.color  === 'string' && /^#[0-9a-f]{6}$/i.test(s.color) &&
     Number.isFinite(s.size) && s.size > 0 && s.size <= 200 &&
-    (s.shape === 'round' || s.shape === 'square')
+    ['round','square','soft','rough','spray','flat'].includes(s.shape)
   );
 }
 

@@ -129,9 +129,12 @@
     .si-round  { border-radius: 50%; }
     .si-square { border-radius: 2px; }
 
+    /* user count + status group */
+    #status-group { margin-left: auto; display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+    #user-count { font-size: 11px; color: var(--dim); min-width: 14px; text-align: right; }
+
     /* status dot */
     #status {
-      margin-left: auto;
       width: 8px; height: 8px;
       border-radius: 50%;
       background: #444;
@@ -244,6 +247,41 @@
     }
     .zbtn:hover  { background: rgba(31,0,72,0.9); border-color: var(--active); }
     .zbtn:active { background: #1a0042; }
+
+    /* ── Brush type row ── */
+    .brush-row { display: flex; gap: 6px; padding: 0 14px 7px; }
+    .brush-btn {
+      flex: 1; height: 30px;
+      border-radius: 7px;
+      border: 1.5px solid transparent;
+      background: var(--btn);
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: background .12s, border-color .12s;
+      padding: 0;
+    }
+    .brush-btn:hover  { background: var(--btnhov); }
+    .brush-btn.active { border-color: var(--active); background: #1a0042; }
+
+    /* ── Tickets button ── */
+    #tickets-btn {
+      position: absolute;
+      top: 12px; left: 12px;
+      z-index: 10;
+      background: rgba(13,0,26,0.85);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      border: 1.5px solid var(--active);
+      color: var(--active);
+      font-size: 10px; font-weight: 700;
+      letter-spacing: 0.08em;
+      padding: 6px 10px;
+      border-radius: 8px;
+      text-decoration: none;
+      white-space: nowrap;
+      transition: background .12s, color .12s;
+    }
+    #tickets-btn:hover { background: var(--active); color: #fff; }
   </style>
 </head>
 <body>
@@ -263,18 +301,6 @@
       <!-- Size slider -->
       <div id="slider-wrap">
         <input type="range" id="size-slider" min="1" max="80" value="6">
-      </div>
-
-      <div class="sep"></div>
-
-      <!-- Shape -->
-      <div style="display:flex;gap:4px;flex-shrink:0">
-        <button class="tbtn shape-btn active" data-shape="round" title="Round">
-          <span class="si si-round"></span>
-        </button>
-        <button class="tbtn shape-btn" data-shape="square" title="Square">
-          <span class="si si-square"></span>
-        </button>
       </div>
 
       <div class="sep"></div>
@@ -307,12 +333,60 @@
         </svg>
       </button>
 
-      <!-- Status dot -->
-      <div id="status" class="connecting" title="Connection"></div>
+      <!-- User count + status -->
+      <div id="status-group">
+        <span id="user-count" title="People painting">–</span>
+        <div id="status" class="connecting" title="Connection"></div>
+      </div>
 
     </div>
 
-    <!-- Row 2: color palette slider -->
+    <!-- Row 2: brush types -->
+    <div class="brush-row">
+      <!-- Round -->
+      <button class="brush-btn active" data-brush="round" title="Round">
+        <svg width="14" height="14" viewBox="0 0 14 14"><circle cx="7" cy="7" r="5" fill="#c4a8ff"/></svg>
+      </button>
+      <!-- Soft / Airbrush -->
+      <button class="brush-btn" data-brush="soft" title="Soft">
+        <svg width="14" height="14" viewBox="0 0 14 14">
+          <circle cx="7" cy="7" r="6" fill="#c4a8ff" opacity="0.25"/>
+          <circle cx="7" cy="7" r="4" fill="#c4a8ff" opacity="0.45"/>
+          <circle cx="7" cy="7" r="2" fill="#c4a8ff"/>
+        </svg>
+      </button>
+      <!-- Rough -->
+      <button class="brush-btn" data-brush="rough" title="Rough">
+        <svg width="14" height="14" viewBox="0 0 14 14">
+          <circle cx="4"  cy="5"  r="1.8" fill="#c4a8ff"/>
+          <circle cx="9"  cy="4"  r="1.2" fill="#c4a8ff"/>
+          <circle cx="7"  cy="9"  r="2.2" fill="#c4a8ff"/>
+          <circle cx="12" cy="8"  r="1"   fill="#c4a8ff"/>
+          <circle cx="3"  cy="11" r="1"   fill="#c4a8ff"/>
+        </svg>
+      </button>
+      <!-- Spray -->
+      <button class="brush-btn" data-brush="spray" title="Spray">
+        <svg width="14" height="14" viewBox="0 0 14 14">
+          <circle cx="7"  cy="7"  r="1"   fill="#c4a8ff"/>
+          <circle cx="3"  cy="4"  r="0.8" fill="#c4a8ff" opacity="0.7"/>
+          <circle cx="11" cy="4"  r="0.8" fill="#c4a8ff" opacity="0.6"/>
+          <circle cx="2"  cy="9"  r="0.7" fill="#c4a8ff" opacity="0.5"/>
+          <circle cx="12" cy="10" r="0.8" fill="#c4a8ff" opacity="0.7"/>
+          <circle cx="6"  cy="12" r="0.7" fill="#c4a8ff" opacity="0.5"/>
+          <circle cx="10" cy="2"  r="0.6" fill="#c4a8ff" opacity="0.4"/>
+          <circle cx="4"  cy="12" r="0.6" fill="#c4a8ff" opacity="0.5"/>
+        </svg>
+      </button>
+      <!-- Flat -->
+      <button class="brush-btn" data-brush="flat" title="Flat">
+        <svg width="14" height="14" viewBox="0 0 14 14">
+          <rect x="1" y="5.5" width="12" height="3" rx="1.5" fill="#c4a8ff"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Row 3: color palette slider -->
     <div class="t-row t-palette">
       <input type="range" id="palette-slider" min="0" max="19" value="8" step="1">
     </div>
@@ -321,11 +395,12 @@
 
   <!-- ── Canvas ──────────────────────────────────────────────── -->
   <div id="canvas-wrap">
-    <canvas id="canvas" width="1200" height="800"></canvas>
+    <canvas id="canvas" width="2400" height="1600"></canvas>
     <div id="zoom-controls">
       <button class="zbtn" id="zoom-in-btn"  title="Zoom in">+</button>
       <button class="zbtn" id="zoom-out-btn" title="Zoom out">−</button>
     </div>
+    <a href="https://sortmyscene.com/event/pareidolia-mar-20-2026" target="_blank" rel="noopener" id="tickets-btn">PRDL005 TICKETS</a>
   </div>
 
 </div>
@@ -365,7 +440,7 @@ const PALETTE = [
 ];
 
 // ── State ─────────────────────────────────────────────────────────
-const tool = { color: '#8b52ff', size: 6, shape: 'round', eraser: false };
+const tool = { color: '#8b52ff', size: 6, brush: 'round', eraser: false };
 
 // ── DOM refs ──────────────────────────────────────────────────────
 const canvas     = document.getElementById('canvas');
@@ -458,11 +533,13 @@ function updateSliderFill() {
 }
 updateSliderFill();
 
-// ── Shapes ────────────────────────────────────────────────────────
-document.querySelectorAll('.shape-btn').forEach(btn => {
+// ── Brush type buttons ────────────────────────────────────────────
+document.querySelectorAll('.brush-btn').forEach(btn => {
   btn.addEventListener('click', () => {
-    tool.shape = btn.dataset.shape;
-    document.querySelectorAll('.shape-btn').forEach(b => b.classList.remove('active'));
+    tool.brush  = btn.dataset.brush;
+    tool.eraser = false;
+    document.getElementById('eraser-btn').classList.remove('active');
+    document.querySelectorAll('.brush-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     updatePreview();
   });
@@ -496,43 +573,88 @@ document.getElementById('share-btn').addEventListener('click', async () => {
 
 // ── Preview dot ───────────────────────────────────────────────────
 function updatePreview() {
-  const MAX_PX = 34;
-  const actualSize = tool.size;
-  const d = Math.min(actualSize, MAX_PX);
-  const isRound = tool.eraser || tool.shape === 'round';
-
+  const d = Math.min(tool.size, 34);
+  const b = tool.brush;
   previewDot.style.width        = d + 'px';
   previewDot.style.height       = d + 'px';
-  previewDot.style.borderRadius = isRound ? '50%' : '3px';
+  previewDot.style.borderRadius = (b === 'flat') ? '2px' : '50%';
   previewDot.style.background   = tool.eraser ? 'transparent' : tool.color;
   previewDot.style.border       = tool.eraser ? '2px dashed #8b52ff' : 'none';
+  previewDot.style.opacity      = (b === 'soft' || b === 'spray') ? '0.55' : '1';
 }
 updatePreview();
 
+// ── Deterministic hash (0–1) for consistent brush rendering across clients ──
+function hash1(n) { const s = Math.sin(n * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); }
+
 // ── Stroke rendering ──────────────────────────────────────────────
 function renderStroke(s) {
+  const brush = s.brush || s.shape || 'round';
   ctx.save();
   ctx.globalCompositeOperation = 'source-over';
   ctx.globalAlpha = 1;
-  ctx.strokeStyle = s.color;
-  ctx.fillStyle   = s.color;
-  ctx.lineWidth   = s.size;
-  ctx.lineCap     = s.shape === 'round' ? 'round' : 'square';
-  ctx.lineJoin    = s.shape === 'round' ? 'round'  : 'miter';
-  ctx.beginPath();
-  ctx.moveTo(s.x0, s.y0);
-  ctx.lineTo(
-    (s.x0 === s.x1 && s.y0 === s.y1) ? s.x1 + 0.01 : s.x1,
-    s.y1
-  );
-  ctx.stroke();
+  ctx.fillStyle = ctx.strokeStyle = s.color;
+
+  if (brush === 'soft') {
+    const dx = s.x1-s.x0, dy = s.y1-s.y0;
+    const len = Math.hypot(dx,dy) || 0.01;
+    const steps = Math.ceil(len / Math.max(1, s.size * 0.12));
+    ctx.globalAlpha = 0.06;
+    for (let i = 0; i <= steps; i++) {
+      const t = i/steps;
+      ctx.beginPath(); ctx.arc(s.x0+dx*t, s.y0+dy*t, s.size, 0, Math.PI*2); ctx.fill();
+    }
+  } else if (brush === 'rough') {
+    const dx = s.x1-s.x0, dy = s.y1-s.y0;
+    const len = Math.hypot(dx,dy) || 0.01;
+    const steps = Math.ceil(len / 1.5);
+    const r = s.size / 2;
+    for (let i = 0; i <= steps; i++) {
+      const t = i/steps, seed = i*3.7 + s.x0*0.13 + s.y0*0.07;
+      const x = s.x0+dx*t + (hash1(seed)-0.5)*r*1.4;
+      const y = s.y0+dy*t + (hash1(seed+0.5)-0.5)*r*1.4;
+      ctx.beginPath(); ctx.arc(x, y, r*0.28*(0.5+hash1(seed+1)), 0, Math.PI*2); ctx.fill();
+    }
+  } else if (brush === 'spray') {
+    const dx = s.x1-s.x0, dy = s.y1-s.y0;
+    const len = Math.hypot(dx,dy) || 0.01;
+    const steps = Math.ceil(len / 4);
+    const dots = Math.max(4, Math.floor(s.size * 0.6));
+    for (let i = 0; i <= steps; i++) {
+      const t = i/steps, cx = s.x0+dx*t, cy = s.y0+dy*t;
+      for (let j = 0; j < dots; j++) {
+        const seed = i*97+j + Math.round(s.x0)*3 + Math.round(s.y0)*7;
+        const a = hash1(seed)*Math.PI*2, r = hash1(seed+0.5)*s.size;
+        ctx.beginPath(); ctx.arc(cx+Math.cos(a)*r, cy+Math.sin(a)*r, 1, 0, Math.PI*2); ctx.fill();
+      }
+    }
+  } else if (brush === 'flat') {
+    const dx = s.x1-s.x0, dy = s.y1-s.y0;
+    const len = Math.hypot(dx,dy) || 0.01;
+    const angle = Math.atan2(dy,dx);
+    const w = s.size*2.5, h = Math.max(2, s.size*0.35);
+    const steps = Math.ceil(len / Math.max(1, h*0.8));
+    for (let i = 0; i <= steps; i++) {
+      const t = i/steps;
+      ctx.save(); ctx.translate(s.x0+dx*t, s.y0+dy*t); ctx.rotate(angle);
+      ctx.fillRect(-w/2, -h/2, w, h); ctx.restore();
+    }
+  } else {
+    // round (default) or square
+    ctx.lineWidth = s.size;
+    ctx.lineCap   = brush === 'square' ? 'square' : 'round';
+    ctx.lineJoin  = brush === 'square' ? 'miter'  : 'round';
+    ctx.beginPath();
+    ctx.moveTo(s.x0, s.y0);
+    ctx.lineTo((s.x0===s.x1 && s.y0===s.y1) ? s.x1+0.01 : s.x1, s.y1);
+    ctx.stroke();
+  }
   ctx.restore();
 }
 
 function effectiveProps() {
-  return tool.eraser
-    ? { color: CANVAS_BG, size: tool.size, shape: 'round' }
-    : { color: tool.color, size: tool.size, shape: tool.shape };
+  if (tool.eraser) return { color: CANVAS_BG, size: tool.size, brush: 'round', shape: 'round' };
+  return { color: tool.color, size: tool.size, brush: tool.brush, shape: tool.brush };
 }
 
 // ── Pointer input ─────────────────────────────────────────────────
@@ -663,13 +785,27 @@ async function initRealtime() {
   const ably = new Ably.Realtime({ authUrl: '/api/token' });
   ablyChannel = ably.channels.get('canvas');
 
-  ably.connection.on('connected',    () => setStatus('connected'));
+  ably.connection.on('connected', async () => {
+    setStatus('connected');
+    try {
+      await ablyChannel.presence.enter();
+      refreshCount();
+    } catch (_) {}
+  });
   ably.connection.on('disconnected', () => setStatus('disconnected'));
   ably.connection.on('suspended',    () => setStatus('disconnected'));
   ably.connection.on('failed',       () => setStatus('disconnected'));
 
   ablyChannel.subscribe('stroke', msg => renderStroke(msg.data));
   ablyChannel.subscribe('clear',  ()  => fillBg());
+  ablyChannel.presence.subscribe(() => refreshCount());
+}
+
+async function refreshCount() {
+  try {
+    const members = await ablyChannel.presence.get();
+    document.getElementById('user-count').textContent = members.length;
+  } catch (_) {}
 }
 
 // Called by drawing code — publish immediately, batch-save to KV
