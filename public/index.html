@@ -273,7 +273,7 @@
       gap: 6px;
       align-items: center;
     }
-    #tickets-btn, #music-btn {
+    #tickets-btn, #music-btn, #randomize-btn {
       background: rgba(13,0,26,0.85);
       backdrop-filter: blur(6px);
       -webkit-backdrop-filter: blur(6px);
@@ -290,7 +290,7 @@
     #tickets-btn {
       text-decoration: none;
     }
-    #tickets-btn:hover, #music-btn:hover { background: var(--active); color: #fff; }
+    #tickets-btn:hover, #music-btn:hover, #randomize-btn:hover { background: var(--active); color: #fff; }
     #music-btn.playing { background: var(--active); color: #fff; }
   </style>
 </head>
@@ -310,7 +310,7 @@
 
       <!-- Size slider -->
       <div id="slider-wrap">
-        <input type="range" id="size-slider" min="3" max="150" value="6">
+        <input type="range" id="size-slider" min="30" max="150" value="40">
       </div>
 
       <div class="sep"></div>
@@ -340,18 +340,6 @@
           <path d="M9 2v9" stroke="#c4a8ff" stroke-width="1.5" stroke-linecap="round"/>
           <path d="M5.5 5.5L9 2l3.5 3.5" stroke="#c4a8ff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
           <path d="M4 10v5h10v-5" stroke="#c4a8ff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-      </button>
-
-      <!-- Randomize -->
-      <button class="tbtn" id="randomize-btn" title="Randomize brush">
-        <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-          <path d="M12 3h3v3" stroke="#c4a8ff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M15 3l-5 5" stroke="#c4a8ff" stroke-width="1.5" stroke-linecap="round"/>
-          <path d="M6 15l-3-3 3-3" stroke="#c4a8ff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M3 12h4" stroke="#c4a8ff" stroke-width="1.5" stroke-linecap="round"/>
-          <path d="M12 15h3v-3" stroke="#c4a8ff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M15 15l-5-5" stroke="#c4a8ff" stroke-width="1.5" stroke-linecap="round"/>
         </svg>
       </button>
 
@@ -425,6 +413,7 @@
     <div id="bottom-left-btns">
       <a href="https://sortmyscene.com/event/pareidolia-mar-20-2026" target="_blank" rel="noopener" id="tickets-btn">PRDL005 TICKETS</a>
       <button id="music-btn">PLAY MUSIC</button>
+      <button id="randomize-btn">RANDOMIZE</button>
     </div>
   </div>
 
@@ -438,7 +427,7 @@
 
 // ── Config ────────────────────────────────────────────────────────
 const CANVAS_BG  = '#0a0010';
-const SIZE_MIN   = 3;
+const SIZE_MIN   = 30;
 const SIZE_MAX   = 150;
 
 const PALETTE = [
@@ -465,7 +454,7 @@ const PALETTE = [
 ];
 
 // ── State ─────────────────────────────────────────────────────────
-const tool = { color: '#8b52ff', size: 6, brush: 'round', eraser: false };
+const tool = { color: '#8b52ff', size: 40, brush: 'round', eraser: false };
 
 // ── DOM refs ──────────────────────────────────────────────────────
 const canvas     = document.getElementById('canvas');
@@ -886,22 +875,35 @@ initRealtime();
 (function() {
   const musicBtn = document.getElementById('music-btn');
   let musicFrame = null;
+  let playing    = false;
+
+  function ytCmd(cmd) {
+    if (musicFrame && musicFrame.contentWindow) {
+      musicFrame.contentWindow.postMessage(
+        JSON.stringify({ event: 'command', func: cmd, args: [] }), '*'
+      );
+    }
+  }
 
   musicBtn.addEventListener('click', () => {
-    if (musicFrame) {
-      musicFrame.remove();
-      musicFrame = null;
-      musicBtn.textContent = 'PLAY MUSIC';
-      musicBtn.classList.remove('playing');
-    } else {
+    if (!musicFrame) {
+      // First press: create iframe and start playing
       musicFrame = document.createElement('iframe');
-      musicFrame.src = 'https://www.youtube.com/embed/mBuadFbRfi4?list=RDmBuadFbRfi4&autoplay=1&start=0';
+      musicFrame.src = 'https://www.youtube.com/embed/mBuadFbRfi4?list=RDmBuadFbRfi4&autoplay=1&enablejsapi=1';
       musicFrame.allow = 'autoplay';
       musicFrame.style.cssText = 'position:fixed;left:-9999px;top:-9999px;width:1px;height:1px;border:none;';
       document.body.appendChild(musicFrame);
-      musicBtn.textContent = 'STOP MUSIC';
-      musicBtn.classList.add('playing');
+      playing = true;
+    } else if (playing) {
+      ytCmd('pauseVideo');
+      playing = false;
+    } else {
+      ytCmd('playVideo');
+      playing = true;
     }
+
+    musicBtn.textContent = playing ? 'STOP MUSIC' : 'PLAY MUSIC';
+    musicBtn.classList.toggle('playing', playing);
   });
 })();
 
