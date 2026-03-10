@@ -350,10 +350,19 @@
       font-size: 9px; font-weight: 600;
       color: var(--dim);
       max-width: 130px;
-      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      overflow: hidden;
       display: none;
       letter-spacing: 0.03em;
       opacity: 0.8;
+      flex-shrink: 0;
+    }
+    #now-playing-text {
+      display: inline-block;
+      white-space: nowrap;
+    }
+    @keyframes scroll-np {
+      0%, 20%  { transform: translateX(0); }
+      80%, 100% { transform: translateX(var(--np-offset, 0px)); }
     }
 
     /* RANDOMIZE: icon-only on small screens */
@@ -509,7 +518,7 @@
     <div id="bottom-left-btns">
       <a href="https://sortmyscene.com/event/pareidolia-mar-20-2026" target="_blank" rel="noopener" id="tickets-btn">PRDL005 TICKETS</a>
       <button id="music-btn">PLAY MUSIC</button>
-      <span id="now-playing"></span>
+      <span id="now-playing"><span id="now-playing-text"></span></span>
     </div>
   </div>
 
@@ -577,6 +586,15 @@ function fillBg() {
   ctx.restore();
 }
 fillBg();
+
+// ── Instagram / in-app browser height fix ─────────────────────────
+// Some IABs (Instagram, Facebook) don't honour height:100% on body.
+// Explicitly set #app height to window.innerHeight so canvas fills screen.
+(function syncAppHeight() {
+  const app = document.getElementById('app');
+  app.style.height = window.innerHeight + 'px';
+  window.addEventListener('resize', () => { app.style.height = window.innerHeight + 'px'; });
+})();
 
 // ── Fit canvas to viewport ────────────────────────────────────────
 const canvasWrap = document.getElementById('canvas-wrap');
@@ -1000,8 +1018,11 @@ initRealtime();
     ls.classList.add('fade-out');
     setTimeout(() => { if (ls.parentNode) ls.remove(); }, 700);
   }
-  // Fallback: dismiss after 8s if API never fires
-  setTimeout(dismissLoader, 8000);
+  // In Instagram/Facebook IAB, YouTube API is blocked — dismiss immediately
+  const isIAB = /Instagram|FBAN|FBAV|FB_IAB/.test(navigator.userAgent);
+  if (isIAB) { dismissLoader(); }
+  // Fallback: dismiss after 5s if API never fires
+  else { setTimeout(dismissLoader, 5000); }
 
   window.onYouTubeIframeAPIReady = function() {
     player = new YT.Player('yt-host', {
@@ -1033,11 +1054,22 @@ initRealtime();
   };
 
   // Retry until video metadata is available
+  const nowPlayText = document.getElementById('now-playing-text');
   function tryUpdateTitle() {
     const title = (player.getVideoData() || {}).title || '';
     if (title) {
-      nowPlayEl.textContent = '♪ ' + title;
+      nowPlayText.textContent = '♪ ' + title;
       nowPlayEl.style.display = 'block';
+      // Measure overflow after paint and animate if needed
+      requestAnimationFrame(() => {
+        const overflow = nowPlayText.scrollWidth - nowPlayEl.clientWidth;
+        if (overflow > 4) {
+          nowPlayEl.style.setProperty('--np-offset', `-${overflow}px`);
+          nowPlayText.style.animation = 'scroll-np 4s ease-in-out infinite alternate';
+        } else {
+          nowPlayText.style.animation = 'none';
+        }
+      });
     } else {
       setTimeout(tryUpdateTitle, 400);
     }
