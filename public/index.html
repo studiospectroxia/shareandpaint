@@ -1037,7 +1037,7 @@ initRealtime();
     const title = (player.getVideoData() || {}).title || '';
     if (title) {
       nowPlayEl.textContent = '♪ ' + title;
-      nowPlayEl.style.display = '';
+      nowPlayEl.style.display = 'block';
     } else {
       setTimeout(tryUpdateTitle, 400);
     }
