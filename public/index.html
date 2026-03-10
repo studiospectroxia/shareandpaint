@@ -307,6 +307,22 @@
       letter-spacing: 0.03em;
       opacity: 0.8;
     }
+
+    /* RANDOMIZE: icon-only on small screens */
+    .rnd-icon { display: none; }
+    @media (max-width: 540px) {
+      #randomize-btn {
+        width: 36px; height: 36px;
+        padding: 0;
+        background: var(--btn);
+        border-color: transparent;
+        border-radius: 7px;
+        display: flex; align-items: center; justify-content: center;
+      }
+      #randomize-btn:hover { background: var(--btnhov); border-color: transparent; color: var(--dim); }
+      .rnd-label { display: none; }
+      .rnd-icon  { display: block; }
+    }
   </style>
 </head>
 <body>
@@ -359,7 +375,17 @@
       </button>
 
       <!-- Randomize -->
-      <button id="randomize-btn">RANDOMIZE</button>
+      <button id="randomize-btn">
+        <svg class="rnd-icon" width="18" height="18" viewBox="0 0 18 18" fill="none">
+          <path d="M12 3h3v3" stroke="#c4a8ff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M15 3l-5 5" stroke="#c4a8ff" stroke-width="1.5" stroke-linecap="round"/>
+          <path d="M6 15l-3-3 3-3" stroke="#c4a8ff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M3 12h4" stroke="#c4a8ff" stroke-width="1.5" stroke-linecap="round"/>
+          <path d="M12 15h3v-3" stroke="#c4a8ff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M15 15l-5-5" stroke="#c4a8ff" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        <span class="rnd-label">RANDOMIZE</span>
+      </button>
 
       <!-- User count + status -->
       <div id="status-group">
@@ -898,7 +924,7 @@ initRealtime();
   const musicBtn  = document.getElementById('music-btn');
   const nowPlayEl = document.getElementById('now-playing');
   let player      = null;
-  let apiLoaded   = false;
+  let playerReady = false;
   let state       = 'idle';   // idle | playing | paused
   let didInitSeek = false;
 
@@ -908,43 +934,50 @@ initRealtime();
   ytHost.style.cssText = 'position:fixed;left:-9999px;top:-9999px;width:1px;height:1px;';
   document.body.appendChild(ytHost);
 
-  // Lazy-load the YouTube IFrame API
-  function loadYTAPI() {
-    if (apiLoaded) return;
-    apiLoaded = true;
-    const s = document.createElement('script');
-    s.src = 'https://www.youtube.com/iframe_api';
-    document.head.appendChild(s);
-  }
+  // Load API eagerly so player is ready before user clicks (preserves user gesture chain)
+  const ytScript = document.createElement('script');
+  ytScript.src = 'https://www.youtube.com/iframe_api';
+  document.head.appendChild(ytScript);
 
   window.onYouTubeIframeAPIReady = function() {
     player = new YT.Player('yt-host', {
       videoId: 'mBuadFbRfi4',
       playerVars: {
         list: 'RDmBuadFbRfi4', listType: 'playlist',
-        autoplay: 1, controls: 0, playsinline: 1,
+        autoplay: 0, controls: 0, playsinline: 1,
       },
       events: {
+        onReady: function() { playerReady = true; },
         onStateChange: function(e) {
           if (e.data === YT.PlayerState.PLAYING) {
+            state = 'playing';
+            updateBtn();
             // On first play: seek to random 0–70% of duration
             if (!didInitSeek) {
               didInitSeek = true;
               const dur = player.getDuration();
               if (dur > 10) player.seekTo(Math.floor(Math.random() * dur * 0.7), true);
             }
-            state = 'playing';
-            const title = (player.getVideoData() || {}).title || '';
-            nowPlayEl.textContent = title ? '♪ ' + title : '';
-            nowPlayEl.style.display = title ? '' : 'none';
+            tryUpdateTitle();
           } else if (e.data === YT.PlayerState.PAUSED) {
             state = 'paused';
+            updateBtn();
           }
-          updateBtn();
         },
       },
     });
   };
+
+  // Retry until video metadata is available
+  function tryUpdateTitle() {
+    const title = (player.getVideoData() || {}).title || '';
+    if (title) {
+      nowPlayEl.textContent = '♪ ' + title;
+      nowPlayEl.style.display = '';
+    } else {
+      setTimeout(tryUpdateTitle, 400);
+    }
+  }
 
   function updateBtn() {
     const labels = { idle: 'PLAY MUSIC', playing: 'PAUSE MUSIC', paused: 'RESUME MUSIC' };
@@ -953,9 +986,9 @@ initRealtime();
   }
 
   musicBtn.addEventListener('click', () => {
-    if (state === 'idle')    { loadYTAPI(); }           // API loads → player created → autoplays
-    else if (state === 'playing') { player.pauseVideo(); }
-    else if (state === 'paused')  { player.playVideo();  }
+    if      (state === 'idle'   && playerReady) { player.playVideo();  }
+    else if (state === 'playing')               { player.pauseVideo(); }
+    else if (state === 'paused')                { player.playVideo();  }
   });
 })();
 
