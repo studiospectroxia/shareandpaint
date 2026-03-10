@@ -18,7 +18,7 @@ function isValid(s) {
     Number.isFinite(s.x1) && Number.isFinite(s.y1) &&
     typeof s.color === 'string' && /^#[0-9a-f]{6}$/i.test(s.color) &&
     Number.isFinite(s.size) && s.size > 0 && s.size <= 200 &&
-    (s.shape === 'round' || s.shape === 'square')
+    ['round', 'square', 'soft', 'rough', 'spray', 'flat'].includes(s.shape || s.brush)
   );
 }
 
@@ -61,7 +61,8 @@ module.exports = async function handler(req, res) {
       y1: Math.round(s.y1 * 100) / 100,
       color: s.color,
       size:  s.size,
-      shape: s.shape,
+      shape: s.shape || s.brush,
+      brush: s.brush || s.shape,
     }));
 
     if (clean.length > 0) {
