@@ -1041,7 +1041,8 @@ async function initRealtime() {
   }
 
   // 2. Connect to Ably (token fetched from /api/token)
-  const ably = new Ably.Realtime({ authUrl: '/api/token' });
+  const clientId = 'u-' + Math.random().toString(36).slice(2, 10);
+  const ably = new Ably.Realtime({ authUrl: '/api/token', clientId });
   ablyChannel = ably.channels.get('canvas');
 
   ably.connection.on('connected', async () => {

@@ -8,6 +8,7 @@ module.exports = async function handler(req, res) {
     const client       = new Ably.Rest(process.env.ABLY_API_KEY);
     const tokenRequest = await client.auth.createTokenRequest({
       capability: { canvas: ['subscribe', 'publish', 'presence'] },
+      clientId: '*',
     });
     res.json(tokenRequest);
   } catch (e) {
