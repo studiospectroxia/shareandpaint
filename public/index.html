@@ -459,6 +459,79 @@
       padding: 5px 8px;
     }
 
+    /* ── Event promo popup ── */
+    #event-popup {
+      position: fixed;
+      bottom: 80px; left: 50%;
+      transform: translateX(-50%) translateY(16px);
+      z-index: 900;
+      background: #0d001a;
+      border: 1px solid var(--active);
+      border-radius: 14px;
+      padding: 20px 22px 16px;
+      max-width: 300px;
+      width: calc(100% - 40px);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.35s, transform 0.35s;
+      text-align: center;
+      box-shadow: 0 8px 40px rgba(139,82,255,0.25);
+    }
+    #event-popup.show {
+      opacity: 1;
+      pointer-events: all;
+      transform: translateX(-50%) translateY(0);
+    }
+    #event-popup-hey {
+      font-size: 11px;
+      color: var(--dim);
+      margin-bottom: 10px;
+      line-height: 1.6;
+      opacity: 0.8;
+    }
+    #event-popup-title {
+      font-size: 14px;
+      font-weight: 900;
+      letter-spacing: 0.16em;
+      color: var(--active);
+      margin-bottom: 4px;
+    }
+    #event-popup-lineup {
+      font-size: 11px;
+      color: var(--dim);
+      opacity: 0.75;
+      margin-bottom: 16px;
+      line-height: 1.6;
+      letter-spacing: 0.04em;
+    }
+    #event-popup-btns { display: flex; flex-direction: column; gap: 7px; }
+    #event-im-in {
+      background: var(--active);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      height: 38px;
+      font-size: 11px; font-weight: 800;
+      letter-spacing: 0.12em;
+      cursor: pointer;
+      text-decoration: none;
+      display: flex; align-items: center; justify-content: center;
+      transition: background .12s;
+    }
+    #event-im-in:hover { background: #7840f5; }
+    #event-later {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--dim);
+      border-radius: 8px;
+      height: 32px;
+      font-size: 10px; font-weight: 600;
+      letter-spacing: 0.08em;
+      cursor: pointer;
+      transition: border-color .12s;
+    }
+    #event-later:hover { border-color: var(--active); }
+
     /* RANDOMIZE: icon-only on small screens */
     .rnd-icon { display: none; }
     @media (max-width: 540px) {
@@ -622,6 +695,17 @@
       <em>The chaos is the art.</em>
     </div>
     <button id="welcome-btn">GET STARTED</button>
+  </div>
+</div>
+
+<!-- Event promo popup -->
+<div id="event-popup">
+  <div id="event-popup-hey">Hey, have you heard about this event? 👀</div>
+  <div id="event-popup-title">PAREIDOLIA 005: OFF-CENTER</div>
+  <div id="event-popup-lineup">20th March · EXT Hyderabad<br>ft. Ayan | Mumboi | Flipsoul</div>
+  <div id="event-popup-btns">
+    <a href="https://sortmyscene.com/event/pareidolia-mar-20-2026" target="_blank" rel="noopener" id="event-im-in">I'M IN</a>
+    <button id="event-later">WILL CHECK OUT LATER</button>
   </div>
 </div>
 
@@ -934,6 +1018,7 @@ function startDraw(pt) {
   const stroke = { x0: lastX, y0: lastY, x1: lastX, y1: lastY, ...props };
   renderStroke(stroke);
   sendMsg({ type: 'stroke', stroke });
+  if (window._onFirstDraw) { window._onFirstDraw(); window._onFirstDraw = null; }
 }
 
 function moveDraw(pt) {
@@ -1262,6 +1347,28 @@ initRealtime();
   }
   document.getElementById('welcome-btn').addEventListener('click', e => { e.stopPropagation(); dismiss(); });
   overlay.addEventListener('click', e => { if (e.target === overlay) dismiss(); });
+})();
+
+// ── Event promo popup (once per session, after 150 s of painting) ─
+(function() {
+  if (sessionStorage.getItem('eventPopupShown')) return;
+  const popup    = document.getElementById('event-popup');
+  const laterBtn = document.getElementById('event-later');
+  const imInLink = document.getElementById('event-im-in');
+
+  function show() {
+    popup.classList.add('show');
+    sessionStorage.setItem('eventPopupShown', '1');
+  }
+  function hide() { popup.classList.remove('show'); }
+
+  // Fire timer on first stroke
+  window._onFirstDraw = function() {
+    setTimeout(show, 150 * 1000);
+  };
+
+  laterBtn.addEventListener('click', hide);
+  imInLink.addEventListener('click', hide);
 })();
 
 // ── Toast ─────────────────────────────────────────────────────────
