@@ -40,8 +40,8 @@ module.exports = async function handler(req, res) {
     return res.status(400).json({ error: 'Invalid data' });
   }
 
-  // Only one client wins the lock per reset cycle (23 hr expiry)
-  const locked = await kv.set('snapshotLock', Date.now(), { nx: true, ex: 82800 });
+  // Only one client wins the lock per reset cycle (5.5 hr expiry — just under the 6h cycle)
+  const locked = await kv.set('snapshotLock', Date.now(), { nx: true, ex: 19800 });
   if (!locked) return res.json({ ok: true, skipped: true });
 
   const now     = new Date();

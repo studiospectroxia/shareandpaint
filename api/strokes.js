@@ -1,15 +1,12 @@
 'use strict';
-// GET  /api/strokes  — return all stored strokes (checks daily reset)
+// GET  /api/strokes  — return all stored strokes (checks 6-hour reset)
 // POST /api/strokes  — append a batch of new strokes
 const { kv }  = require('@vercel/kv');
 const Ably    = require('ably');
 
-const MAX_STROKES = 100_000;
-const TRIM_COUNT  = Math.floor(MAX_STROKES * 0.2);
-
-function today() {
-  return new Date().toISOString().slice(0, 10);
-}
+const MAX_STROKES    = 100_000;
+const TRIM_COUNT     = Math.floor(MAX_STROKES * 0.2);
+const RESET_INTERVAL = 6 * 60 * 60 * 1000; // 6 hours in ms
 
 function isValid(s) {
   return (
@@ -26,15 +23,19 @@ module.exports = async function handler(req, res) {
   // ── GET: return all strokes ────────────────────────────────────
   if (req.method === 'GET') {
     try {
-      const [resetDate, strokes] = await Promise.all([
-        kv.get('resetDate'),
+      const [lastResetAt, strokes] = await Promise.all([
+        kv.get('lastResetAt'),
         kv.lrange('strokes', 0, -1),
       ]);
 
-      const t = today();
-      if (resetDate !== t) {
-        // New day — wipe canvas
-        await Promise.all([kv.del('strokes'), kv.set('resetDate', t)]);
+      const now = Date.now();
+      if (!lastResetAt || now - Number(lastResetAt) >= RESET_INTERVAL) {
+        // 6 hours elapsed — wipe canvas and reset snapshot lock
+        await Promise.all([
+          kv.del('strokes'),
+          kv.del('snapshotLock'),
+          kv.set('lastResetAt', now),
+        ]);
         // Tell any currently-connected Ably clients to clear
         try {
           const ably = new Ably.Rest(process.env.ABLY_API_KEY);

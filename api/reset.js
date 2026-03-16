@@ -8,7 +8,7 @@ async function doReset() {
   await Promise.all([
     kv.del('strokes'),
     kv.del('snapshotLock'),
-    kv.set('resetDate', new Date().toISOString().slice(0, 10)),
+    kv.set('lastResetAt', Date.now()),
   ]);
   const ably = new Ably.Rest(process.env.ABLY_API_KEY);
   await ably.channels.get('canvas').publish('clear', {});
