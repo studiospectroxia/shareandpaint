@@ -508,14 +508,6 @@
 
       <div class="sep"></div>
 
-      <!-- Reset canvas -->
-      <button class="tbtn" id="reset-btn" title="Clear canvas">
-        <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-          <path d="M2.5 9a6.5 6.5 0 1 0 1.4-4" stroke="#c4a8ff" stroke-width="1.5" stroke-linecap="round"/>
-          <path d="M2.5 3.5v3.5H6" stroke="#c4a8ff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-      </button>
-
       <!-- Share link -->
       <button class="tbtn" id="share-btn" title="Copy share link">
         <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
@@ -626,7 +618,7 @@
       PAREIDOLIA presents a collaborative art playground — open to anyone with this link.<br><br>
       Paint together in real time. No rules, no undo, no knowing what the person next to you is about to do. That's the point.<br><br>
       Pick a brush, pick a colour, or hit RANDOMIZE and let chance decide. The canvas is shared by everyone — strangers included — and every stroke you make lands for the whole room to see.<br><br>
-      Every 6 hours the canvas clears and what was made is gone. Until then, anything goes.<br><br>
+      Every 6 hours the canvas is snapshotted and cleared — a fresh cycle begins. Until then, anything goes.<br><br>
       <em>The chaos is the art.</em>
     </div>
     <button id="welcome-btn">GET STARTED</button>
@@ -804,12 +796,6 @@ document.getElementById('eraser-btn').addEventListener('click', () => {
   updatePreview();
 });
 
-// ── Reset canvas ──────────────────────────────────────────────────
-document.getElementById('reset-btn').addEventListener('click', async () => {
-  if (!confirm('Clear the canvas for everyone?')) return;
-  // fillBg() fires when the Ably 'clear' event arrives for all clients
-  await fetch('/api/reset', { method: 'POST' }).catch(() => {});
-});
 
 // ── Share link ────────────────────────────────────────────────────
 document.getElementById('share-btn').addEventListener('click', async () => {
