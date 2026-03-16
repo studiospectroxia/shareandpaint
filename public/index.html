@@ -1056,17 +1056,32 @@ async function initRealtime() {
   ablyChannel.subscribe('stroke', msg => renderStroke(msg.data));
   ablyChannel.subscribe('clear',  async () => { await takeSnapshot(); fillBg(); });
 
-  // Track presence with a local Set — reliable across all Ably sync phases
+  // Track presence: event-driven Set for instant updates + periodic reconciliation
   const presenceSet = new Set();
   const countEl     = document.getElementById('user-count');
+
+  function updateCount() {
+    countEl.textContent = presenceSet.size;
+  }
+
   ablyChannel.presence.subscribe(msg => {
     if (msg.action === 'leave') {
       presenceSet.delete(msg.clientId);
     } else {
       presenceSet.add(msg.clientId); // enter | present | update
     }
-    countEl.textContent = presenceSet.size;
+    updateCount();
   });
+
+  // Reconcile every 10s — catches missed events when tab was backgrounded
+  setInterval(async () => {
+    try {
+      const members = await ablyChannel.presence.get();
+      presenceSet.clear();
+      members.forEach(m => presenceSet.add(m.clientId));
+      updateCount();
+    } catch (_) {}
+  }, 10000);
 }
 
 // Called by drawing code — publish immediately, batch-save to KV
