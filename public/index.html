@@ -1165,13 +1165,7 @@ initRealtime();
   else { setTimeout(dismissLoader, 5000); }
 
   const TRACKS = ['mBuadFbRfi4', 'XyGmvTZmMBY', 'IOUzTWFm_ds'];
-  let lastTrackIdx = -1;
-  function pickTrack() {
-    let idx;
-    do { idx = Math.floor(Math.random() * TRACKS.length); } while (idx === lastTrackIdx && TRACKS.length > 1);
-    lastTrackIdx = idx;
-    return TRACKS[idx];
-  }
+  const selectedTrack = TRACKS[Math.floor(Math.random() * TRACKS.length)];
 
   window.onYouTubeIframeAPIReady = function() {
     player = new YT.Player('yt-host', {
@@ -1234,7 +1228,7 @@ initRealtime();
   musicBtn.addEventListener('click', () => {
     if (state === 'idle' && playerReady) {
       didInitSeek = false;
-      player.loadVideoById(pickTrack());
+      player.loadVideoById(selectedTrack);
     } else if (state === 'playing') { player.pauseVideo(); }
     else if (state === 'paused')    { player.playVideo();  }
   });
