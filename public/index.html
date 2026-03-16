@@ -1070,7 +1070,7 @@ async function initRealtime() {
   ably.connection.on('failed',       () => setStatus('disconnected'));
 
   ablyChannel.subscribe('stroke', msg => renderStroke(msg.data));
-  ablyChannel.subscribe('clear',  ()  => fillBg());
+  ablyChannel.subscribe('clear',  async () => { await takeSnapshot(); fillBg(); });
   ablyChannel.presence.subscribe(() => refreshCount());
 }
 
@@ -1105,6 +1105,22 @@ async function flushStrokes() {
 }
 
 function setStatus(s) { statusEl.className = s; }
+
+// Snapshot canvas (scaled to 1200×800 JPEG) → POST to /api/snapshot
+// Server uses a KV lock so only the first client to call this commits.
+async function takeSnapshot() {
+  try {
+    const snap = document.createElement('canvas');
+    snap.width = 1200; snap.height = 800;
+    snap.getContext('2d').drawImage(canvas, 0, 0, 1200, 800);
+    const dataUrl = snap.toDataURL('image/jpeg', 0.82);
+    await fetch('/api/snapshot', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ dataUrl }),
+    });
+  } catch (_) {}
+}
 
 initRealtime();
 
